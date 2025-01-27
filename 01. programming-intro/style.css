@@ -1,0 +1,8 @@
+.title{
+    /* key: value; */
+    color: red;
+    background-color: beige;
+    text-align: center;
+    height: 200px;
+    border: 1px solid black;
+}
