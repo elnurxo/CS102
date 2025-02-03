@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XSS Attack Example</title>
+</head>
+<body>
+
+    <input type="text" id="userInput" placeholder="Enter text">
+    <button onclick="displayText()">Submit</button>
+
+    <p id="output"></p>
+
+    <script>
+        function displayText() {
+            let userInput = document.getElementById("userInput").value;
+            document.getElementById("output").innerHTML = userInput; // ⚠️ Vulnerable to XSS
+        }
+    </script>
+
+</body>
+</html>
