@@ -1,0 +1,40 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <title>Search | Filter users</title>
+</head>
+
+<body>
+    <h2 class="text-center my-4 lead">Users live search | filter | sort</h2>
+    <input id="search" type="text" placeholder="search user..." class="form-control w-25 mx-auto">
+    <select class="form-control W-25 mx-auto my-3" name="country" id="country">
+        <option value="" disabled selected>filter by country</option>
+        <option value="united kingdom">United Kingdom</option>
+        <option value="united states">United States of America</option>
+        <option value="canada">Canada</option>
+        <option value="germany">Germany</option>
+        <option value="australia">Australia</option>
+    </select>
+
+    <!-- sort -->
+    <select class="form-control W-25 mx-auto my-3" name="sort" id="sort">
+        <option value="" disabled selected>sort by full name</option>
+        <option value="a-z">A-Z</option>
+        <option value="z-a">Z-A</option>
+    </select>
+
+    <hr class="mx-auto w-50 my-3">
+
+    <ul class="list-group w-25 mx-auto mt-3 users-list">
+     
+    </ul>
+
+    <script type="module" src="./script.js"></script>
+</body>
+
+</html>

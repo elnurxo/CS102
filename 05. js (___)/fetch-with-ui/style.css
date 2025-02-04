@@ -1,0 +1,27 @@
+header {
+  height: 80px;
+  background: rgb(2, 0, 36);
+  background: linear-gradient(
+    90deg,
+    rgba(2, 0, 36, 1) 0%,
+    rgba(9, 17, 121, 1) 35%,
+    rgba(0, 212, 255, 1) 100%
+  );
+}
+.navbar {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  justify-content: space-between;
+}
+.navbar ul{
+    display: flex;
+    list-style: none;
+    gap: 12px;
+    margin: 0;
+}
+.navbar ul li a{
+    color: black;
+    font-weight: bold;
+    text-decoration: none;
+}
