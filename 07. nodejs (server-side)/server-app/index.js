@@ -2,11 +2,29 @@ const express = require("express");
 const app = express();
 require("dotenv").config();
 const { v4: uuidv4 } = require("uuid");
+const { rateLimit } = require("express-rate-limit");
+const authenticate_API_KEY = require("./src/middlewares/authApiKey.js");
+const productSchema = require("./src/validations/productValidate.js");
 //require products
 let products = require("./src/data.js");
 
 //simple middleware
-app.use(express.json());
+app.use(express.json()); //post body json
+
+//rate limit for dos attack
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  message: "Too many requests, please try again later...",
+  limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes).
+  standardHeaders: "draft-8", // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
+  //   store: ... , // Redis, Memcached, etc. See below. //cache
+});
+
+app.use(limiter);
+
+//custom middleware - API KEY authentication
+// app.use();
 
 //simple get request
 app.get("/api", (_, response) => {
@@ -64,73 +82,87 @@ app.get("/api/products/:id", (req, res) => {
 });
 
 //delete product by id
-app.delete("/api/products/:id", (req, res) => {
-  const id = req.params.id;
-  const checkProduct = products.find((x) => x.id == id);
-  if (!checkProduct) {
-    return res.json({
-      message: "product not found!",
-      data: null,
-    });
-  } else {
-    //array methods
-    products = [
-      ...products.filter((product) => {
-        return product.id != id;
-      }),
-    ];
-    //   products.splice(products.indexOf((x)=>x.id==id), 1);
-    res.json({
-      message: "product deleted successfully!",
-      data: products,
-    });
+app.delete(
+  "/api/products/:id",
+  (req, res, next) => authenticate_API_KEY(req, res, next),
+  (req, res) => {
+    const id = req.params.id;
+    const checkProduct = products.find((x) => x.id == id);
+    if (!checkProduct) {
+      return res.json({
+        message: "product not found!",
+        data: null,
+      });
+    } else {
+      //array methods
+      products = [
+        ...products.filter((product) => {
+          return product.id != id;
+        }),
+      ];
+      //   products.splice(products.indexOf((x)=>x.id==id), 1);
+      res.json({
+        message: "product deleted successfully!",
+        data: products,
+      });
+    }
   }
-});
+);
 
 //post request
-app.post("/api/products", (req, res) => {
-  const newProduct = req.body;
-
-  //simple validation
-  if (newProduct.name && newProduct.price) {
+app.post(
+  "/api/products",
+  (req, res, next) => authenticate_API_KEY(req, res, next),
+  (req, res, next) => {
+    const isValidated = productSchema.validate(req.body);
+    if (!isValidated.error) {
+      next();
+    } else {
+      res.json({
+        message: isValidated.error.details[0].message,
+        status: "fail",
+      });
+    }
+  },
+  (req, res) => {
+    const newProduct = req.body;
     newProduct.id = uuidv4();
     products.push(newProduct);
     res.status(201).json({
       message: "product posted successfully!",
       data: newProduct,
     });
-  } else {
-    res.json({
-      message: "product format is invalid!",
-      data: null,
-    });
   }
-});
+);
 
 //update request
-app.patch("/api/products/:id", (req, res) => {
-  const id = req.params.id;
-  const updatedProduct = req.body;
+app.patch(
+  "/api/products/:id",
+  (req, res, next) => authenticate_API_KEY(req, res, next),
+  (req, res) => {
+    const id = req.params.id;
+    const updatedProduct = req.body;
 
-  const found = products.find((x) => x.id == id);
-  if (found) {
-    if (updatedProduct.name) {
-      found.name = updatedProduct.name;
+    const found = products.find((x) => x.id == id);
+    if (found) {
+      if (updatedProduct.name) {
+        found.name = updatedProduct.name;
+      }
+      if (updatedProduct.price) {
+        found.price = updatedProduct.price;
+      }
+      res.json({
+        message: "product updated successfully!",
+        data: found,
+      });
+    } else {
+      res.json({
+        message: "product not found!",
+        data: null,
+      });
     }
-    if (updatedProduct.price) {
-      found.price = updatedProduct.price;
-    }
-    res.json({
-      message: "product updated successfully!",
-      data: found,
-    });
-  } else {
-    res.json({
-      message: "product not found!",
-      data: null,
-    });
   }
-});
+);
 
 //APP LISTENING
 app.listen(process.env.PORT, () => {
