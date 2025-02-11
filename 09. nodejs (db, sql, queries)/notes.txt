@@ -1,0 +1,9 @@
+cors + 
+helmet + 
+token expire time + 
+- - - - - - - - - - - - 
+SQL (db - relational vs non-relational) +
+SQL installation, SSMS +
+SQL queries +
+SQL joins +
+relations +
