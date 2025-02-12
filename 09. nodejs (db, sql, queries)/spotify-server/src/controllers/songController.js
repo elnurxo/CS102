@@ -1,23 +1,27 @@
-let songs = require("../models/songs.js");
-const { v4: uuidv4 } = require("uuid");
+const Song = require("../models/songs.js");
+const { Op } = require("sequelize");
 
 //get all
-function getAllSongs(req, res) {
+async function getAllSongs(req, res) {
   //query - title
   const { title } = req.query;
 
   try {
     if (title) {
       res.status(200).json({
-        data: songs.filter((x) =>
-          x.title.toLowerCase().trim().includes(title.toLowerCase().trim())
-        ),
-        message: "songs retrieved successfully!F",
+        data: await Song.findAll({
+          where: {
+            title: {
+              [Op.like]: `%${title}%`, // Use the LIKE operator for partial matching
+            },
+          },
+        }),
+        message: "songs retrieved successfully!",
       });
     } else {
       res.status(200).json({
-        data: songs,
-        message: "songs retrieved successfully!F",
+        data: await Song.findAll(),
+        message: "songs retrieved successfully!",
       });
     }
   } catch (error) {
@@ -29,12 +33,12 @@ function getAllSongs(req, res) {
 }
 
 //get one
-function getOneSong(req, res) {
+async function getOneSong(req, res) {
   //params - id
   const { id } = req.params;
 
   try {
-    const foundSong = songs.find((x) => x.id == id);
+    const foundSong = await Song.findByPk(id);
     if (foundSong) {
       res.status(200).json({
         data: foundSong,
@@ -55,16 +59,19 @@ function getOneSong(req, res) {
 }
 
 //delete one
-function deleteSong(req, res) {
+async function deleteSong(req, res) {
   //params - id
   const { id } = req.params;
 
   try {
-    const foundSong = songs.find((x) => x.id == id);
+    const foundSong = await Song.findByPk(id);
     if (foundSong) {
-      songs = [...songs.filter((x) => x.id != id)];
+      // delete from SQL server - DB
+      const deleted = await Song.destroy({
+        where: { id },
+      });
       res.status(200).json({
-        data: songs,
+        data: deleted,
         message: "song deleted successfully!",
       });
     } else {
@@ -82,15 +89,15 @@ function deleteSong(req, res) {
 }
 
 //post
-function postSong(req, res) {
+async function postSong(req, res) {
   //body - payload new data
   const newSong = req.body;
 
   try {
-    newSong.id = uuidv4();
-    songs.push(newSong);
+    // newSong.id = uuidv4();
+    const postedSong = await Song.create(newSong);
     res.status(201).json({
-      data: newSong,
+      data: postedSong,
       message: "song posted successfully!",
     });
   } catch (error) {
@@ -102,20 +109,31 @@ function postSong(req, res) {
 }
 
 //update
-function updateSong(req, res) {
+async function updateSong(req, res) {
   //body - payload new data
   const { id } = req.params;
   const { title, genre, releaseYear, artist, coverImage } = req.body;
 
   try {
-    const foundSong = songs.find((x) => x.id == id);
+    const foundSong = await Song.findByPk(id);
     if (foundSong) {
-      //update
-      foundSong.title = title ? title : foundSong.title;
-      foundSong.genre = genre ? genre : foundSong.genre;
-      foundSong.releaseYear = releaseYear ? releaseYear : foundSong.releaseYear;
-      foundSong.artist = artist ? artist : foundSong.artist;
-      foundSong.coverImage = coverImage ? coverImage : foundSong.coverImage;
+      const [updated] = await Song.update(
+        {
+          title,
+          genre,
+          releaseYear,
+          artist,
+          coverImage,
+        },
+        {
+          where: { id },
+          returning: true,
+        }
+      );
+      res.status(200).json({
+        data: updated,
+        message: "song updated successfully!",
+      });
     } else {
       res.status(204).json({
         data: null,

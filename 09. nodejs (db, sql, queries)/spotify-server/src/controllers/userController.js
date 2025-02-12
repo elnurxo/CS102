@@ -1,141 +1,163 @@
-let users = require("../models/users.js");
-const { v4: uuidv4 } = require("uuid");
+const User = require("../models/users.js");
+const { Op } = require("sequelize");
 const bcrypt = require("bcrypt");
 const transporter = require("../config/sendMailer.js");
 const jwt = require("jsonwebtoken");
 
-//get all users
-function getAllUsers(req, res) {
+async function getAllUsers(req, res) {
   try {
     const { email } = req.query;
+    let users; //undefined
+
     if (email) {
-      const filteredUsers = users.filter((x) => {
-        return x.email
-          .toUpperCase()
-          .trim()
-          .includes(email.toUpperCase().trim());
-      });
-      res.status(200).json({
-        data: filteredUsers,
-        message: "users get successfully!",
+      users = await User.findAll({
+        where: {
+          email: {
+            [Op.like]: `%${email.trim().toUpperCase()}%`,
+          },
+        },
+        attributes: { exclude: ["password"] },
       });
     } else {
-      res.status(200).json({
-        data: users, //extract password from here
-        message: "users get successfully!",
+      users = await User.findAll({
+        attributes: { exclude: ["password"] },
       });
     }
+
+    res.status(200).json({
+      data: users,
+      message: "Users fetched successfully!",
+    });
   } catch (error) {
-    res.json({
-      message: error.message ? error.message : "failed to get users!",
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      message: error.message || "Failed to get users!",
       status: "failed",
     });
   }
 }
 
-//get one user by ID
-function getUserById(req, res) {
+async function getUserById(req, res) {
   try {
     const { id } = req.params;
-    const foundUser = users.find((x) => x.id == id);
+
+    // Fetch the user by ID
+    const foundUser = await User.findByPk(id, {
+      attributes: { exclude: ["password"] }, // Exclude password from the response
+    });
+
     if (foundUser) {
-      //ok
       res.status(200).json({
-        message: "user get successfully!",
+        message: "User retrieved successfully!",
         data: foundUser,
       });
     } else {
-      res.status(204).json({
-        message: "user not found with given ID!",
+      res.status(404).json({
+        message: "User not found with the given ID!",
         data: null,
       });
     }
   } catch (error) {
-    res.json({
-      message: error.message ? error.message : "failed to get user!",
+    console.error("Error retrieving user:", error);
+    res.status(500).json({
+      message: error.message || "Failed to get user!",
       status: "failed",
     });
   }
 }
 
-//register - POST
 async function registerUser(req, res) {
   try {
     const { username, fullName, email, password } = req.body;
-    const newUser = {
-      id: uuidv4(),
-      username: username,
-      fullName: fullName,
-      email: email,
-      role: "admin",
-      password: password, //hashed
-      createdAt: new Date(),
-      lastLogin: new Date(),
-      isVerified: false,
-    };
-    const hashedPassword = bcrypt.hashSync(newUser.password, 10);
-    newUser.password = hashedPassword;
-    //validation check - duplicate username or email
-    const duplicate = users.find((x) => {
-      return x.username == username || x.email == email;
+
+    // Check if username or email already exists in the database
+    const duplicate = await User.findOne({
+      where: {
+        [Op.or]: [{ username }, { email }],
+      },
     });
 
     if (duplicate) {
-      return res.json({
-        message: "username or email already take in!",
+      return res.status(400).json({
+        message: "Username or email is already taken!",
         status: "failed",
       });
-    } else {
-      users.push(newUser);
-      //send email
-      //generate token to verify account
-      const token = jwt.sign(
-        {
-          email: newUser.email,
-          role: newUser.role,
-          userId: newUser.id,
-        },
-        process.env.JWT_SECRET_KEY
-      );
-
-      await transporter.sendMail({
-        from: "Code Academy 👻",
-        to: email,
-        subject: "Verify your account!",
-        text: "This is test mail verification",
-        html: `<a href="http://localhost:7070/api/users/verify/${token}">verify your account</a> <p>if this email was not sent by you, ignore this email!</p>`,
-      });
-
-      res.status(201).json({
-        data: newUser,
-        message: "user registered successfully!",
-      });
     }
+
+    // Hash the password before saving to the database
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    // Create the new user in the database
+    const newUser = await User.create({
+      username,
+      fullName,
+      email,
+      password: hashedPassword,
+      role: "client", // default role
+      isVerified: false, // initially false
+      lastLogin: new Date(), // set current date
+    });
+
+    // Generate a JWT token for email verification
+    const token = jwt.sign(
+      {
+        email: newUser.email,
+        role: newUser.role,
+        userId: newUser.id,
+      },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "6h" } // Optional expiration for token
+    );
+
+    // Send verification email with the generated token
+    await transporter.sendMail({
+      from: "Code Academy 👻",
+      to: newUser.email,
+      subject: "Verify your account!",
+      text: "This is a test mail verification.",
+      html: `<a href="http://localhost:7070/api/users/verify/${token}">Verify your account</a><p>This Link is valid for 6 hours!</p> <p>If this email was not sent by you, please ignore it!</p>`,
+    });
+
+    res.status(201).json({
+      data: {
+        id: newUser.id,
+        username: newUser.username,
+        fullName: newUser.fullName,
+        email: newUser.email,
+      },
+      message: "User registered successfully!",
+    });
   } catch (error) {
-    res.json({
-      data: null,
-      error: error,
+    console.error("Error registering user:", error);
+    res.status(500).json({
+      message: error.message || "User registration failed!",
       status: "failed",
-      message: "user registered failed!",
     });
   }
 }
 
 //login - token Generate
-function loginUser(req, res) {
-  const { email, password } = req.body;
+async function loginUser(req, res) {
+  try {
+    const { email, password } = req.body;
 
-  const foundUser = users.find((x) => x.email === email);
-  if (foundUser) {
-    //login - check password and email
-    if (foundUser.isVerified) {
-      const checkPassword = bcrypt.compareSync(password, foundUser.password);
-      if (checkPassword == true) {
-        //ok
-        foundUser.lastLogin = new Date();
+    // Find the user by email using Sequelize
+    const foundUser = await User.findOne({
+      where: { email },
+    });
 
-        res.status(200).json({
-          token: jwt.sign(
+    if (foundUser) {
+      // Check if the account is verified
+      if (foundUser.isVerified) {
+        // Compare the provided password with the stored hash
+        const checkPassword = bcrypt.compareSync(password, foundUser.password);
+        if (checkPassword) {
+          // Update the last login time
+          foundUser.lastLogin = new Date();
+          await foundUser.save();
+
+          // Generate the JWT token
+          const token = jwt.sign(
             {
               userId: foundUser.id,
               role: foundUser.role,
@@ -143,27 +165,37 @@ function loginUser(req, res) {
             },
             process.env.JWT_SECRET_KEY,
             {
-              expiresIn: "6h",
+              expiresIn: "6h", // Optional: Set token expiration time
             }
-          ), //refresh
-          message: `welcome ${foundUser.username}`,
-          status: "success",
-        });
+          );
+
+          return res.status(200).json({
+            token,
+            message: `Welcome ${foundUser.username}!`,
+            status: "success",
+          });
+        } else {
+          return res.status(401).json({
+            message: "Email or password is incorrect!",
+            status: "failed",
+          });
+        }
       } else {
-        res.status(401).json({
-          message: "email or password is incorrect!",
+        return res.status(400).json({
+          message: "Please verify your account!",
           status: "failed",
         });
       }
     } else {
-      return res.json({
-        message: "verify your account now!",
+      return res.status(404).json({
+        message: "No such user found!",
         status: "failed",
       });
     }
-  } else {
-    return res.json({
-      message: "no such user!",
+  } catch (error) {
+    console.error("Error during login:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to log in!",
       status: "failed",
     });
   }
@@ -176,38 +208,59 @@ function loginUser(req, res) {
 //delete
 
 //verify
-function verifyAccount(req, res) {
-  const { token } = req.params;
-  if (token) {
-    const verifiedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+async function verifyAccount(req, res) {
+  try {
+    const { token } = req.params;
 
-    if (verifiedToken) {
-      const foundUser = users.find((x) => x.email == verifiedToken.email);
-      if (foundUser) {
-        foundUser.isVerified = true;
-        return res.status(200).json({
-          message: "account verified successfully!",
-          status: "success",
+    if (token) {
+      // Verify the token using the secret key
+      const verifiedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+      if (verifiedToken) {
+        // Find the user by email using Sequelize
+        const foundUser = await User.findOne({
+          where: { email: verifiedToken.email },
         });
+
+        if (foundUser) {
+          // Update the user's 'isVerified' field to true
+          foundUser.isVerified = true;
+          await foundUser.save();
+
+          return res.status(200).json({
+            message: "Account verified successfully!",
+            status: "success",
+          });
+        } else {
+          return res.status(404).json({
+            message: "Invalid account!",
+            status: "failed",
+          });
+        }
       } else {
-        return res.json({
-          message: "invalid account!",
+        return res.status(400).json({
+          message: "Invalid token provided!",
           status: "failed",
         });
       }
     } else {
-      return res.json({
-        message: "invalid token provided!",
+      return res.status(400).json({
+        message: "Token not provided!",
         status: "failed",
       });
     }
-  } else {
-    return res.json({
-      message: "token not provided!",
+  } catch (error) {
+    console.error("Error verifying account:", error);
+    return res.status(500).json({
+      message: error.message || "Account verification failed!",
       status: "failed",
     });
   }
 }
+
+//forgot-password
+
+//reset-password
 
 const userController = {
   getAll: getAllUsers,

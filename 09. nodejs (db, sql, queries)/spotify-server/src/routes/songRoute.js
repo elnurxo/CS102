@@ -6,7 +6,7 @@ const verifyJWTToken = require("../middlewares/verifyToken.js");
 const verifyRole = require("../middlewares/verifyRole.js");
 
 //get all - RBAC - client, admin
-songRouter.get("/", verifyJWTToken, verifyRole('admin'), songController.getAll);
+songRouter.get("/", verifyJWTToken, verifyRole("admin"), songController.getAll);
 
 //get one
 songRouter.get("/:id", songController.getOne);

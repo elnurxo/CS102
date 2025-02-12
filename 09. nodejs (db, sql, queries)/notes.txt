@@ -1,9 +1,5 @@
-cors + 
-helmet + 
-token expire time + 
-- - - - - - - - - - - - 
-SQL (db - relational vs non-relational) +
-SQL installation, SSMS +
-SQL queries +
-SQL joins +
-relations +
+create migration command (in src)
+npx sequelize-cli migration:generate --name create-product-table
+
+execute migration (outside src)
+npx sequelize-cli db:migrate --config src/config/config.js --migrations-path src/migrations

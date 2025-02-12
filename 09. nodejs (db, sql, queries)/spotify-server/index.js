@@ -7,7 +7,7 @@ const limiter = require("./src/config/rateLimiter.js");
 const userRouter = require("./src/routes/userRoute.js");
 const cors = require("cors");
 const helmet = require("helmet");
-
+const { startDatabase } = require("./src/config/db.js");
 //middleware
 app.use(limiter);
 app.use(express.json()); //post JSON
@@ -34,9 +34,20 @@ app.use(cors()); //allow all origins
 app.use(
   helmet({
     contentSecurityPolicy: false,
+    xssFilter: true,
   })
 );
 
-app.listen(PORT, () => {
-  console.log(`Example app listening on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await startDatabase(); // Ensure DB is connected before starting the server
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to connect to the database:", err);
+    process.exit(1); // Exit if database connection fails
+  }
+};
+
+startServer();
